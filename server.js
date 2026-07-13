@@ -11,6 +11,10 @@ import { errorMiddleware } from './middleware/errorMiddleware.js';
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// ─── Trust Render / Heroku / Railway reverse proxy ────────────────────────────
+// Without this, express-rate-limit sees the load-balancer IP for every request.
+app.set('trust proxy', 1);
+
 // ─── Security Headers ──────────────────────────────────────────────────────────
 app.use(helmet());
 
@@ -18,7 +22,10 @@ app.use(helmet());
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:4173',
-  process.env.FRONTEND_URL, // set on Render for production
+  process.env.FRONTEND_URL,          // primary production URL (set on Render)
+  process.env.FRONTEND_URL_ALT,      // optional second origin (Netlify preview, etc.)
+  'https://nexgenbyte.netlify.app',  // fallback Netlify subdomain
+  'https://celadon-llama-875daa.netlify.app', // specific Netlify app
 ].filter(Boolean);
 
 app.use(
@@ -26,7 +33,15 @@ app.use(
     origin: (origin, callback) => {
       // Allow requests with no origin (e.g. Postman, curl, server-to-server)
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
+      
+      if (
+        allowedOrigins.includes(origin) ||
+        origin.endsWith('.netlify.app') ||
+        origin.startsWith('http://localhost:')
+      ) {
+        return callback(null, true);
+      }
+      
       callback(new Error(`CORS: origin "${origin}" not allowed`));
     },
     methods: ['GET', 'POST'],
@@ -48,6 +63,7 @@ const limiter = rateLimit({
 });
 
 // ─── Request Logging (development only) ───────────────────────────────────────
+// Log in dev; on Render set NODE_ENV=production to silence this
 if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
 }
