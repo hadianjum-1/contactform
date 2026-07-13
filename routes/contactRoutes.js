@@ -4,6 +4,10 @@ import { handleContact } from '../controllers/contactController.js';
 
 const router = Router();
 
+router.options('/', (_req, res) => {
+  res.sendStatus(204);
+});
+
 /**
  * POST /api/contact
  *

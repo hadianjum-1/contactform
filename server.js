@@ -22,29 +22,35 @@ app.use(helmet());
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:4173',
+  'https://nexgenbyte.com',
+  'https://www.nexgenbyte.com',
   process.env.FRONTEND_URL,          // primary production URL (set on Render)
   process.env.FRONTEND_URL_ALT,      // optional second origin (Netlify preview, etc.)
   'https://nexgenbyte.netlify.app',  // fallback Netlify subdomain
   'https://celadon-llama-875daa.netlify.app', // specific Netlify app
 ].filter(Boolean);
 
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+
+  if (allowedOrigins.includes(origin)) return true;
+  if (origin.endsWith('.netlify.app')) return true;
+  if (origin.endsWith('.nexgenbyte.com')) return true;
+  if (origin.startsWith('http://localhost:')) return true;
+
+  return false;
+};
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. Postman, curl, server-to-server)
-      if (!origin) return callback(null, true);
-      
-      if (
-        allowedOrigins.includes(origin) ||
-        origin.endsWith('.netlify.app') ||
-        origin.startsWith('http://localhost:')
-      ) {
+      if (isAllowedOrigin(origin)) {
         return callback(null, true);
       }
-      
+
       callback(new Error(`CORS: origin "${origin}" not allowed`));
     },
-    methods: ['GET', 'POST'],
+    methods: ['GET', 'POST', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
   })
