@@ -41,9 +41,6 @@ app.use(
   })
 );
 
-// Handle preflight requests
-app.options("*", cors());
-
 // Request logging
 if (process.env.NODE_ENV !== "production") {
   app.use(morgan("dev"));
