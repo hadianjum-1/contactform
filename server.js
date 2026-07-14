@@ -1,24 +1,23 @@
-import 'dotenv/config';
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import rateLimit from 'express-rate-limit';
+import "dotenv/config";
+import express from "express";
+import cors from "cors";
+import helmet from "helmet";
+import morgan from "morgan";
+import rateLimit from "express-rate-limit";
 
-import contactRoutes from './routes/contactRoutes.js';
-import { errorMiddleware } from './middleware/errorMiddleware.js';
+import contactRoutes from "./routes/contactRoutes.js";
+import { errorHandler } from "./middleware/errorMiddleware.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// ─── Trust Render / Heroku / Railway reverse proxy ────────────────────────────
-// Without this, express-rate-limit sees the load-balancer IP for every request.
-app.set('trust proxy', 1);
+// Trust Render/Heroku proxy
+app.set("trust proxy", 1);
 
-// ─── Security Headers ──────────────────────────────────────────────────────────
+// Security headers
 app.use(helmet());
 
-// ─── CORS ─────────────────────────────────────────────────────────────────────
+// CORS
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:4173",
@@ -26,68 +25,87 @@ const allowedOrigins = [
   "https://www.nexgenbyte.com",
 ];
 
-app.use(cors({
-  origin(origin, callback) {
-    if (!origin) return callback(null, true);
+app.use(
+  cors({
+    origin(origin, callback) {
+      // Allow Postman, server-to-server requests
+      if (!origin) return callback(null, true);
 
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
 
-    return callback(new Error(`Origin ${origin} not allowed by CORS`));
-  },
-  credentials: true,
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-}))
+      return callback(new Error("Origin not allowed by CORS"));
+    },
+    credentials: true,
+  })
+);
 
+// Handle preflight requests
 app.options("*", cors());
 
-// ─── Rate Limiting ─────────────────────────────────────────────────────────────
+// Request logging
+if (process.env.NODE_ENV !== "production") {
+  app.use(morgan("dev"));
+}
+
+// Body parser
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
+
+// Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20,                   // max 20 contact submissions per IP per window
+  windowMs: 15 * 60 * 1000,
+  max: 20,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
     success: false,
-    message: 'Too many requests from this IP. Please try again after 15 minutes.',
+    message: "Too many requests. Please try again later.",
   },
 });
 
-// ─── Request Logging (development only) ───────────────────────────────────────
-// Log in dev; on Render set NODE_ENV=production to silence this
-if (process.env.NODE_ENV !== 'production') {
-  app.use(morgan('dev'));
-}
+app.use("/api/contact", limiter);
 
-// ─── Body Parsing ─────────────────────────────────────────────────────────────
-app.use(express.json({ limit: '15mb' }));       // support large base64 attachments
-app.use(express.urlencoded({ extended: true }));
-
-// ─── Health Check & Root Route ────────────────────────────────────────────────
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-app.get('/', (_req, res) => {
-  res.json({ status: 'ok', message: 'NexGenByte API is running.' });
+// Health check
+app.get("/", (req, res) => {
+  res.json({
+    success: true,
+    message: "NexGenByte API is running.",
+  });
 });
 
-// ─── Routes ───────────────────────────────────────────────────────────────────
-app.use('/api/contact', limiter, contactRoutes);
-app.use('/contact', limiter, contactRoutes);
-
-
-// ─── 404 Handler ──────────────────────────────────────────────────────────────
-app.use((_req, res) => {
-  res.status(404).json({ success: false, message: 'Route not found.' });
+app.get("/health", (req, res) => {
+  res.json({
+    success: true,
+    status: "OK",
+    timestamp: new Date().toISOString(),
+  });
 });
 
-// ─── Global Error Handler ─────────────────────────────────────────────────────
-app.use(errorMiddleware);
+// Routes
+app.use("/api/contact", contactRoutes);
 
-// ─── Start Server ─────────────────────────────────────────────────────────────
+// 404
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: "Route not found.",
+  });
+});
+
+// Error Handler (always last)
+app.use(errorHandler);
+
+// Start server
 app.listen(PORT, () => {
-  console.log(`✅  NexGenByte API running on port ${PORT}`);
-  console.log(`   ENV: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`
+==================================
+ NexGenByte API Started
+==================================
+ Environment : ${process.env.NODE_ENV}
+ Port        : ${PORT}
+ URL         : http://localhost:${PORT}
+==================================
+`);
 });

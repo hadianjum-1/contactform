@@ -1,148 +1,20 @@
-import nodemailer from 'nodemailer';
-import dns from 'dns';
+import nodemailer from "nodemailer";
 
-// Force Node to prefer IPv4 first when resolving hostnames.
-// This prevents ENETUNREACH errors on networks/platforms that do not support IPv6.
-if (dns && typeof dns.setDefaultResultOrder === 'function') {
-  dns.setDefaultResultOrder('ipv4first');
-}
+export const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT),
+    secure: Number(process.env.SMTP_PORT) === 465,
 
-let activeTransporter = null;
-
-/**
- * Creates and verifies a reusable Nodemailer transporter.
- * Manually resolves the hostname to IPv4 first to bypass IPv6 ENETUNREACH errors.
- */
-const getTransporter = async () => {
-  if (activeTransporter) return activeTransporter;
-
-  const host = process.env.SMTP_HOST;
-  const port = Number(process.env.SMTP_PORT) || 465;
-
-  let targetHost = host;
-  const tlsOptions = {};
-
-  if (host) {
-    try {
-      const resolvedIp = await new Promise((resolve, reject) => {
-        dns.lookup(host, { family: 4 }, (err, address) => {
-          if (err || !address) {
-            reject(err || new Error(`No IPv4 address resolved for host ${host}`));
-          } else {
-            resolve(address);
-          }
-        });
-      });
-      console.log(`📡 Resolved SMTP host ${host} to IPv4: ${resolvedIp}`);
-      targetHost = resolvedIp;
-      tlsOptions.servername = host; // Essential for verifying TLS certificates on IP connection
-    } catch (error) {
-      console.warn(`⚠️ Failed to resolve SMTP host ${host} to IPv4 (falling back to hostname):`, error.message);
+    auth:{
+        user:process.env.SMTP_USER,
+        pass:process.env.SMTP_PASS
     }
-  }
-
-  activeTransporter = nodemailer.createTransport({
-    host: targetHost,
-    port,
-    secure: port === 465, // true for port 465 (SSL), false for 587 (TLS/STARTTLS)
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-    tls: tlsOptions,
-  });
-
-  return activeTransporter;
-};
-
-/**
- * Send email via Resend's HTTP API (bypasses SMTP blocking on Render Free Tier).
- */
-const sendViaResend = async (mailOptions) => {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    throw new Error('RESEND_API_KEY environment variable is not defined.');
-  }
-
-  // Format recipients to array
-  const to = Array.isArray(mailOptions.to) ? mailOptions.to : [mailOptions.to];
-  const cc = mailOptions.cc ? (Array.isArray(mailOptions.cc) ? mailOptions.cc : [mailOptions.cc]) : undefined;
-
-  // Format attachments for Resend (expects base64 content string)
-  const attachments = mailOptions.attachments?.map((att) => ({
-    filename: att.filename,
-    content: Buffer.isBuffer(att.content) ? att.content.toString('base64') : att.content,
-  }));
-
-  const payload = {
-    from: mailOptions.from,
-    to,
-    cc,
-    subject: mailOptions.subject,
-    html: mailOptions.html,
-    attachments,
-  };
-
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || `Resend API returned status ${response.status}`);
-  }
-
-  return data;
-};
-
-// Export a compatible object proxying the original transporter API
-export const transporter = {
-  sendMail: async (mailOptions) => {
-    // If RESEND_API_KEY is configured, prioritize Resend HTTP API to bypass Render's SMTP blocks
-    if (process.env.RESEND_API_KEY) {
-      console.log('📨 Sending email via Resend HTTP API...');
-      return sendViaResend(mailOptions);
-    }
-    
-    console.log('📨 Sending email via Hostinger SMTP...');
-    const transport = await getTransporter();
-    return transport.sendMail(mailOptions);
-  },
-  verify: async (callback) => {
-    if (process.env.RESEND_API_KEY) {
-      console.log('✅ Resend HTTP API selected — SMTP verification bypassed');
-      if (typeof callback === 'function') callback(null);
-      return;
-    }
-
-    try {
-      const transport = await getTransporter();
-      transport.verify(callback);
-    } catch (error) {
-      if (typeof callback === 'function') callback(error);
-    }
-  },
-};
-
-/**
- * Verify connection / config on startup
- */
-transporter.verify((error) => {
-  if (error) {
-    console.warn('⚠️  SMTP connection failed:', error.message);
-  } else {
-    if (process.env.RESEND_API_KEY) {
-      console.log('✅  Resend HTTP API configuration detected');
-    } else {
-      console.log('✅  SMTP transporter ready — Hostinger connected');
-    }
-  }
 });
 
-
+transporter.verify((err)=>{
+    if(err){
+        console.error(err);
+    }else{
+        console.log("SMTP Connected");
+    }
+});
