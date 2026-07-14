@@ -1,13 +1,4 @@
 import { body, validationResult } from 'express-validator';
-import sanitizeHtml from 'sanitize-html';
-
-/* ─────────────────────────────────────────────────────────────
-   sanitize-html config — strip ALL tags / attributes
-───────────────────────────────────────────────────────────── */
-const sanitizeOptions = { allowedTags: [], allowedAttributes: {} };
-
-const sanitize = (value) =>
-  typeof value === 'string' ? sanitizeHtml(value.trim(), sanitizeOptions) : value;
 
 /* ─────────────────────────────────────────────────────────────
    Validation chain
@@ -15,73 +6,73 @@ const sanitize = (value) =>
 export const contactValidators = [
   body('name')
     .trim()
+    .escape()
     .isLength({ min: 2 })
-    .withMessage('Name must be at least 2 characters.')
-    .customSanitizer(sanitize),
+    .withMessage('Name must be at least 2 characters.'),
 
   body('email')
     .trim()
+    .normalizeEmail()
     .isEmail()
-    .withMessage('Please enter a valid email address.')
-    .normalizeEmail(),
+    .withMessage('Please enter a valid email address.'),
 
   body('company')
     .trim()
+    .escape()
     .notEmpty()
-    .withMessage('Company name is required.')
-    .customSanitizer(sanitize),
+    .withMessage('Company name is required.'),
 
   body('website')
     .optional({ checkFalsy: true })
     .trim()
+    .escape()
     .isURL({ require_protocol: true })
-    .withMessage('Please enter a valid URL (include https://).')
-    .customSanitizer(sanitize),
+    .withMessage('Please enter a valid URL (include https://).'),
 
   body('phone')
     .optional({ checkFalsy: true })
     .trim()
-    .customSanitizer(sanitize),
+    .escape(),
 
   body('country')
     .trim()
+    .escape()
     .isLength({ min: 2 })
-    .withMessage('Country is required.')
-    .customSanitizer(sanitize),
+    .withMessage('Country is required.'),
 
   body('service')
     .trim()
+    .escape()
     .notEmpty()
     .withMessage('Please select a service.')
     .isIn(['Website Design', 'Web Application', 'E-commerce', 'Branding', 'Other'])
-    .withMessage('Invalid service selected.')
-    .customSanitizer(sanitize),
+    .withMessage('Invalid service selected.'),
 
   body('budget')
     .trim()
+    .escape()
     .notEmpty()
     .withMessage('Please select a budget range.')
     .isIn(['under-5k', '5k-15k', '15k-30k', '30k-plus'])
-    .withMessage('Invalid budget range.')
-    .customSanitizer(sanitize),
+    .withMessage('Invalid budget range.'),
 
   body('timeline')
     .trim()
+    .escape()
     .notEmpty()
-    .withMessage('Timeline is required.')
-    .customSanitizer(sanitize),
+    .withMessage('Timeline is required.'),
 
   body('businessGoals')
     .trim()
+    .escape()
     .isLength({ min: 10 })
-    .withMessage('Business goals must be at least 10 characters.')
-    .customSanitizer(sanitize),
+    .withMessage('Business goals must be at least 10 characters.'),
 
   body('projectDetails')
     .trim()
+    .escape()
     .isLength({ min: 20 })
-    .withMessage('Project description must be at least 20 characters.')
-    .customSanitizer(sanitize),
+    .withMessage('Project description must be at least 20 characters.'),
 
   // attachment is validated separately in the controller (size, mimetype)
 ];
