@@ -1,14 +1,22 @@
 import nodemailer from 'nodemailer';
+import dns from 'dns';
+
+// Force Node to prefer IPv4 first when resolving hostnames.
+// This prevents ENETUNREACH errors on networks/platforms that do not support IPv6.
+if (dns && typeof dns.setDefaultResultOrder === 'function') {
+  dns.setDefaultResultOrder('ipv4first');
+}
 
 /**
  * Creates and verifies a reusable Nodemailer transporter using
  * Hostinger SMTP credentials from environment variables.
  */
 const createTransporter = () => {
+  const port = Number(process.env.SMTP_PORT) || 465;
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT) || 465,
-    secure: true, // true for port 465 (SSL)
+    port,
+    secure: port === 465, // true for port 465 (SSL), false for 587 (TLS/STARTTLS)
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
@@ -31,3 +39,4 @@ transporter.verify((error) => {
     console.log('✅  SMTP transporter ready — Hostinger connected');
   }
 });
+

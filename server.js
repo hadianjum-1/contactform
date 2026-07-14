@@ -65,13 +65,18 @@ if (process.env.NODE_ENV !== 'production') {
 app.use(express.json({ limit: '15mb' }));       // support large base64 attachments
 app.use(express.urlencoded({ extended: true }));
 
-// ─── Health Check ─────────────────────────────────────────────────────────────
+// ─── Health Check & Root Route ────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+app.get('/', (_req, res) => {
+  res.json({ status: 'ok', message: 'NexGenByte API is running.' });
 });
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/contact', limiter, contactRoutes);
+app.use('/contact', limiter, contactRoutes);
+
 
 // ─── 404 Handler ──────────────────────────────────────────────────────────────
 app.use((_req, res) => {
