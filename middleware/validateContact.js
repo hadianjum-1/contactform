@@ -6,28 +6,29 @@ import { body, validationResult } from 'express-validator';
 export const contactValidators = [
   body('name')
     .trim()
-    .escape()
     .isLength({ min: 2 })
-    .withMessage('Name must be at least 2 characters.'),
+    .withMessage('Name must be at least 2 characters.')
+    .escape(),
 
   body('email')
     .trim()
     .normalizeEmail()
     .isEmail()
-    .withMessage('Please enter a valid email address.'),
+    .withMessage('Please enter a valid email address.')
+    .escape(),
 
   body('company')
     .trim()
-    .escape()
     .notEmpty()
-    .withMessage('Company name is required.'),
+    .withMessage('Company name is required.')
+    .escape(),
 
   body('website')
     .optional({ checkFalsy: true })
     .trim()
-    .escape()
     .isURL({ require_protocol: true })
-    .withMessage('Please enter a valid URL (include https://).'),
+    .withMessage('Please enter a valid URL (include https://).')
+    .escape(),
 
   body('phone')
     .optional({ checkFalsy: true })
@@ -36,43 +37,43 @@ export const contactValidators = [
 
   body('country')
     .trim()
-    .escape()
     .isLength({ min: 2 })
-    .withMessage('Country is required.'),
+    .withMessage('Country is required.')
+    .escape(),
 
   body('service')
     .trim()
-    .escape()
     .notEmpty()
     .withMessage('Please select a service.')
     .isIn(['Website Design', 'Web Application', 'E-commerce', 'Branding', 'Other'])
-    .withMessage('Invalid service selected.'),
+    .withMessage('Invalid service selected.')
+    .escape(),
 
   body('budget')
     .trim()
-    .escape()
     .notEmpty()
     .withMessage('Please select a budget range.')
     .isIn(['under-5k', '5k-15k', '15k-30k', '30k-plus'])
-    .withMessage('Invalid budget range.'),
+    .withMessage('Invalid budget range.')
+    .escape(),
 
   body('timeline')
     .trim()
-    .escape()
     .notEmpty()
-    .withMessage('Timeline is required.'),
+    .withMessage('Timeline is required.')
+    .escape(),
 
   body('businessGoals')
     .trim()
-    .escape()
     .isLength({ min: 10 })
-    .withMessage('Business goals must be at least 10 characters.'),
+    .withMessage('Business goals must be at least 10 characters.')
+    .escape(),
 
   body('projectDetails')
     .trim()
-    .escape()
     .isLength({ min: 20 })
-    .withMessage('Project description must be at least 20 characters.'),
+    .withMessage('Project description must be at least 20 characters.')
+    .escape(),
 
   // attachment is validated separately in the controller (size, mimetype)
 ];
