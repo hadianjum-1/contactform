@@ -23,6 +23,8 @@ const allowedOrigins = [
   "http://localhost:4173",
   "https://nexgenbyte.com",
   "https://www.nexgenbyte.com",
+  "https://contactform-two-beryl.vercel.app",
+  "https://contactform-two-beryl.vercel.app/",
 ];
 
 app.use(
@@ -31,13 +33,17 @@ app.use(
       // Allow Postman, server-to-server requests
       if (!origin) return callback(null, true);
 
-      if (allowedOrigins.includes(origin)) {
+      const normalizedOrigin = origin.replace(/\/+$/, "");
+
+      if (allowedOrigins.includes(origin) || allowedOrigins.includes(normalizedOrigin)) {
         return callback(null, true);
       }
 
       return callback(new Error("Origin not allowed by CORS"));
     },
     credentials: true,
+    methods: ["GET", "HEAD", "PUT", "PATCH", "POST", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
