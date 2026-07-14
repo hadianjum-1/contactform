@@ -55,31 +55,94 @@ const getTransporter = async () => {
   return activeTransporter;
 };
 
+/**
+ * Send email via Resend's HTTP API (bypasses SMTP blocking on Render Free Tier).
+ */
+const sendViaResend = async (mailOptions) => {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) {
+    throw new Error('RESEND_API_KEY environment variable is not defined.');
+  }
+
+  // Format recipients to array
+  const to = Array.isArray(mailOptions.to) ? mailOptions.to : [mailOptions.to];
+  const cc = mailOptions.cc ? (Array.isArray(mailOptions.cc) ? mailOptions.cc : [mailOptions.cc]) : undefined;
+
+  // Format attachments for Resend (expects base64 content string)
+  const attachments = mailOptions.attachments?.map((att) => ({
+    filename: att.filename,
+    content: Buffer.isBuffer(att.content) ? att.content.toString('base64') : att.content,
+  }));
+
+  const payload = {
+    from: mailOptions.from,
+    to,
+    cc,
+    subject: mailOptions.subject,
+    html: mailOptions.html,
+    attachments,
+  };
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.message || `Resend API returned status ${response.status}`);
+  }
+
+  return data;
+};
+
 // Export a compatible object proxying the original transporter API
 export const transporter = {
   sendMail: async (mailOptions) => {
+    // If RESEND_API_KEY is configured, prioritize Resend HTTP API to bypass Render's SMTP blocks
+    if (process.env.RESEND_API_KEY) {
+      console.log('📨 Sending email via Resend HTTP API...');
+      return sendViaResend(mailOptions);
+    }
+    
+    console.log('📨 Sending email via Hostinger SMTP...');
     const transport = await getTransporter();
     return transport.sendMail(mailOptions);
   },
   verify: async (callback) => {
+    if (process.env.RESEND_API_KEY) {
+      console.log('✅ Resend HTTP API selected — SMTP verification bypassed');
+      if (typeof callback === 'function') callback(null);
+      return;
+    }
+
     try {
       const transport = await getTransporter();
       transport.verify(callback);
     } catch (error) {
-      callback(error);
+      if (typeof callback === 'function') callback(error);
     }
   },
 };
 
 /**
- * Verify SMTP connection on startup — logs a warning if credentials are wrong
- * so the server still starts (avoiding hard crashes in CI / cold-starts).
+ * Verify connection / config on startup
  */
 transporter.verify((error) => {
   if (error) {
     console.warn('⚠️  SMTP connection failed:', error.message);
   } else {
-    console.log('✅  SMTP transporter ready — Hostinger connected');
+    if (process.env.RESEND_API_KEY) {
+      console.log('✅  Resend HTTP API configuration detected');
+    } else {
+      console.log('✅  SMTP transporter ready — Hostinger connected');
+    }
   }
 });
+
 
