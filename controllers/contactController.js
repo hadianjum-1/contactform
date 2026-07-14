@@ -26,11 +26,15 @@ export const handleContact = async (req, res, next) => {
       attachment, // { filename, type, content (base64) } | null
     } = req.body;
 
+    console.log(`[contactController] Received contact form submission from: ${email}`);
+
     let nodemailerAttachments = [];
 
     // Validate optional attachment
     if (attachment && attachment.content) {
+      console.log(`[contactController] Validating attachment: ${attachment.filename} (${attachment.type})`);
       if (!ALLOWED_MIME.has(attachment.type)) {
+        console.warn(`[contactController] Attachment validation failed: Invalid MIME type ${attachment.type}`);
         return res.status(422).json({
           success: false,
           message: "Attachment must be a PDF, DOC, or DOCX file.",
@@ -39,6 +43,7 @@ export const handleContact = async (req, res, next) => {
 
       const byteLength = Buffer.byteLength(attachment.content, "base64");
       if (byteLength > MAX_ATTACHMENT_BYTES) {
+        console.warn(`[contactController] Attachment validation failed: Size ${byteLength} bytes exceeds 10MB limit`);
         return res.status(422).json({
           success: false,
           message: "Attachment must be 10 MB or smaller.",
@@ -52,6 +57,7 @@ export const handleContact = async (req, res, next) => {
           contentType: attachment.type,
         },
       ];
+      console.log(`[contactController] Attachment validation passed and buffered.`);
     }
 
     const formData = {
@@ -80,11 +86,26 @@ export const handleContact = async (req, res, next) => {
       subject: "Thank you for contacting NexGenByte",
     };
 
-    // Send both emails concurrently using Hostinger SMTP Nodemailer transporter
-    await Promise.all([
-      transporter.sendMail(ownerMailOptions),
-      transporter.sendMail(confirmationMailOptions),
-    ]);
+    console.log("[contactController] Initiating email sending pipeline...");
+
+    const sendOwnerMail = async () => {
+      console.log("[contactController] Sending Owner notification email...");
+      const result = await transporter.sendMail(ownerMailOptions);
+      console.log("[contactController] Owner notification email sent successfully.");
+      return result;
+    };
+
+    const sendCustomerMail = async () => {
+      console.log("[contactController] Sending Customer confirmation email...");
+      const result = await transporter.sendMail(confirmationMailOptions);
+      console.log("[contactController] Customer confirmation email sent successfully.");
+      return result;
+    };
+
+    // Send both emails concurrently
+    await Promise.all([sendOwnerMail(), sendCustomerMail()]);
+
+    console.log("[contactController] All emails sent successfully. Returning success to client.");
 
     return res.status(200).json({
       success: true,
